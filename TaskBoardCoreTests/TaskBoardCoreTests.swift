@@ -39,6 +39,55 @@ final class TaskBoardCoreTests: XCTestCase {
     XCTAssertFalse(completed.isOverdue(referenceDate: referenceDate, calendar: calendar))
   }
 
+  func testDueUrgencyUsesProgressiveDeadlineWindows() {
+    let referenceDate = date(18, hour: 16)
+
+    XCTAssertEqual(
+      TaskItem(title: "Late", dueDate: date(17)).dueUrgency(
+        referenceDate: referenceDate,
+        calendar: calendar
+      ),
+      .overdue
+    )
+    XCTAssertEqual(
+      TaskItem(title: "Today", dueDate: date(18, hour: 1)).dueUrgency(
+        referenceDate: referenceDate,
+        calendar: calendar
+      ),
+      .dueToday
+    )
+    XCTAssertEqual(
+      TaskItem(title: "Soon", dueDate: date(20)).dueUrgency(
+        referenceDate: referenceDate,
+        calendar: calendar
+      ),
+      .dueSoon
+    )
+    XCTAssertEqual(
+      TaskItem(title: "Approaching", dueDate: date(25)).dueUrgency(
+        referenceDate: referenceDate,
+        calendar: calendar
+      ),
+      .approaching
+    )
+    XCTAssertEqual(
+      TaskItem(title: "Later", dueDate: date(26)).dueUrgency(
+        referenceDate: referenceDate,
+        calendar: calendar
+      ),
+      .later
+    )
+  }
+
+  func testCompletedTaskUrgencyIsNeutralEvenWhenOverdue() {
+    let task = TaskItem(title: "Finished", status: .done, dueDate: date(10))
+
+    XCTAssertEqual(
+      task.dueUrgency(referenceDate: date(18), calendar: calendar),
+      .completed
+    )
+  }
+
   func testStatsCountOpenDoneAndOverdueTasks() {
     let referenceDate = date(18)
     let tasks = [

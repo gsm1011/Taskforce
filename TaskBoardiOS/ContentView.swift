@@ -862,6 +862,10 @@ private struct TaskRow: View {
   let onEdit: () -> Void
   let onDelete: () -> Void
 
+  private var dueUrgency: TaskDueUrgency {
+    task.dueUrgency()
+  }
+
   var body: some View {
     HStack(alignment: .top, spacing: 2) {
       Button(action: onToggle) {
@@ -902,9 +906,18 @@ private struct TaskRow: View {
 
           Spacer(minLength: 0)
 
-          Label(task.dueDate.formatted(.dateTime.month(.abbreviated).day()), systemImage: "calendar")
-            .fontWeight(.medium)
-            .foregroundStyle(task.isOverdue() ? .red : .secondary)
+          Label(
+            task.dueDate.formatted(.dateTime.month(.abbreviated).day()),
+            systemImage: dueUrgency.symbolName
+          )
+          .fontWeight(.semibold)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .foregroundStyle(dueUrgency.tintColor)
+          .background(dueUrgency.tintColor.opacity(0.12), in: Capsule())
+          .accessibilityLabel(
+            "\(dueUrgency.accessibilityLabel), \(task.dueDate.formatted(date: .long, time: .omitted))"
+          )
 
           Menu {
             ForEach(TaskStatus.allCases) { status in
@@ -923,10 +936,23 @@ private struct TaskRow: View {
     .padding(.leading, 6)
     .padding(.trailing, 14)
     .padding(.vertical, 12)
-    .background(AppTheme.card, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+    .background {
+      RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
+        .fill(AppTheme.card)
+        .overlay {
+          RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
+            .fill(dueUrgency.tintColor.opacity(dueUrgency.cardTintOpacity))
+        }
+    }
     .overlay {
       RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
-        .stroke(AppTheme.border, lineWidth: 0.5)
+        .stroke(dueUrgency.borderColor, lineWidth: dueUrgency.borderWidth)
+    }
+    .overlay(alignment: .leading) {
+      Capsule()
+        .fill(dueUrgency.tintColor)
+        .frame(width: 4)
+        .padding(.vertical, 12)
     }
     .contentShape(Rectangle())
     .onTapGesture(perform: onEdit)
@@ -949,6 +975,88 @@ private struct TaskRow: View {
       Button(role: .destructive, action: onDelete) {
         Label("Delete", systemImage: "trash")
       }
+    }
+  }
+}
+
+extension TaskDueUrgency {
+  fileprivate var tintColor: Color {
+    switch self {
+    case .completed:
+      return .secondary
+    case .overdue:
+      return .red
+    case .dueToday:
+      return Color(red: 0.88, green: 0.24, blue: 0.12)
+    case .dueSoon:
+      return .orange
+    case .approaching:
+      return Color(red: 0.76, green: 0.48, blue: 0.02)
+    case .later:
+      return AppTheme.accent
+    }
+  }
+
+  fileprivate var symbolName: String {
+    switch self {
+    case .completed:
+      return "calendar.badge.checkmark"
+    case .overdue:
+      return "exclamationmark.circle.fill"
+    case .dueToday:
+      return "calendar.badge.exclamationmark"
+    case .dueSoon, .approaching, .later:
+      return "calendar"
+    }
+  }
+
+  fileprivate var accessibilityLabel: String {
+    switch self {
+    case .completed:
+      return "Completed task due"
+    case .overdue:
+      return "Overdue"
+    case .dueToday:
+      return "Due today"
+    case .dueSoon:
+      return "Due within two days"
+    case .approaching:
+      return "Due within seven days"
+    case .later:
+      return "Due later"
+    }
+  }
+
+  fileprivate var cardTintOpacity: Double {
+    switch self {
+    case .overdue:
+      return 0.09
+    case .dueToday:
+      return 0.075
+    case .dueSoon:
+      return 0.055
+    case .approaching:
+      return 0.035
+    case .completed, .later:
+      return 0
+    }
+  }
+
+  fileprivate var borderColor: Color {
+    switch self {
+    case .overdue, .dueToday, .dueSoon, .approaching:
+      return tintColor.opacity(0.18)
+    case .completed, .later:
+      return AppTheme.border
+    }
+  }
+
+  fileprivate var borderWidth: CGFloat {
+    switch self {
+    case .overdue, .dueToday:
+      return 1
+    case .completed, .dueSoon, .approaching, .later:
+      return 0.5
     }
   }
 }

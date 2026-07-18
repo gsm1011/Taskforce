@@ -49,6 +49,15 @@ public enum TaskPriority: String, CaseIterable, Codable, Identifiable {
   }
 }
 
+public enum TaskDueUrgency: Equatable {
+  case completed
+  case overdue
+  case dueToday
+  case dueSoon
+  case approaching
+  case later
+}
+
 public enum ProjectColor: String, CaseIterable, Codable, Identifiable {
   case blue
   case teal
@@ -125,6 +134,30 @@ public struct TaskItem: Identifiable, Codable, Equatable {
   ) -> Bool {
     guard status != .done else { return false }
     return calendar.startOfDay(for: dueDate) < calendar.startOfDay(for: referenceDate)
+  }
+
+  public func dueUrgency(
+    referenceDate: Date = Date(),
+    calendar: Calendar = .current
+  ) -> TaskDueUrgency {
+    guard status != .done else { return .completed }
+
+    let referenceDay = calendar.startOfDay(for: referenceDate)
+    let dueDay = calendar.startOfDay(for: dueDate)
+    let daysUntilDue = calendar.dateComponents([.day], from: referenceDay, to: dueDay).day ?? 0
+
+    switch daysUntilDue {
+    case ..<0:
+      return .overdue
+    case 0:
+      return .dueToday
+    case 1...2:
+      return .dueSoon
+    case 3...7:
+      return .approaching
+    default:
+      return .later
+    }
   }
 }
 
