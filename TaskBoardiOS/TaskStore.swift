@@ -16,8 +16,7 @@ final class TaskStore: ObservableObject {
     self.storage = storage
 
     let initialProjects: [ProjectItem]
-    if
-      let data = storage.data(forKey: projectsStorageKey),
+    if let data = storage.data(forKey: projectsStorageKey),
       let savedProjects = try? decoder.decode([ProjectItem].self, from: data)
     {
       initialProjects = savedProjects
@@ -26,8 +25,7 @@ final class TaskStore: ObservableObject {
     }
     projects = initialProjects
 
-    if
-      let data = storage.data(forKey: storageKey),
+    if let data = storage.data(forKey: storageKey),
       let savedTasks = try? decoder.decode([TaskItem].self, from: data)
     {
       tasks = savedTasks
@@ -79,7 +77,8 @@ final class TaskStore: ObservableObject {
     updatedTask.title = trimmedTitle
     updatedTask.notes = task.notes.trimmingCharacters(in: .whitespacesAndNewlines)
     if updatedTask.status == .done {
-      updatedTask.completedAt = tasks[index].status == .done
+      updatedTask.completedAt =
+        tasks[index].status == .done
         ? tasks[index].completedAt
         : Date()
     } else {

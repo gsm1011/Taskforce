@@ -1,5 +1,5 @@
-import SwiftUI
 import Charts
+import SwiftUI
 
 private enum StatusFilter: String, CaseIterable, Identifiable {
   case all
@@ -990,8 +990,8 @@ private struct PriorityBadge: View {
   }
 }
 
-private extension TaskPriority {
-  var sortRank: Int {
+extension TaskPriority {
+  fileprivate var sortRank: Int {
     switch self {
     case .high:
       return 0
@@ -1002,7 +1002,7 @@ private extension TaskPriority {
     }
   }
 
-  var backgroundColor: Color {
+  fileprivate var backgroundColor: Color {
     switch self {
     case .high:
       return Color.red.opacity(0.16)
@@ -1013,7 +1013,7 @@ private extension TaskPriority {
     }
   }
 
-  var foregroundColor: Color {
+  fileprivate var foregroundColor: Color {
     switch self {
     case .high:
       return .red
@@ -1025,8 +1025,8 @@ private extension TaskPriority {
   }
 }
 
-private extension TaskStatus {
-  var tintColor: Color {
+extension TaskStatus {
+  fileprivate var tintColor: Color {
     switch self {
     case .todo:
       return .secondary
@@ -1038,8 +1038,8 @@ private extension TaskStatus {
   }
 }
 
-private extension ProjectColor {
-  var swiftUIColor: Color {
+extension ProjectColor {
+  fileprivate var swiftUIColor: Color {
     switch self {
     case .blue:
       return .blue

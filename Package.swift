@@ -19,5 +19,10 @@ let package = Package(
       dependencies: ["TaskBoardCore"],
       path: "TaskBoardCoreSmokeTests"
     ),
+    .testTarget(
+      name: "TaskBoardCoreTests",
+      dependencies: ["TaskBoardCore"],
+      path: "TaskBoardCoreTests"
+    ),
   ]
 )

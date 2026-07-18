@@ -215,7 +215,8 @@ public enum TaskBoardLogic {
   ) -> [TaskItem] {
     let cleanedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-    return tasks
+    return
+      tasks
       .filter { task in
         let searchable = "\(task.title) \(task.notes)".lowercased()
         let matchesQuery = cleanedQuery.isEmpty || searchable.contains(cleanedQuery)
