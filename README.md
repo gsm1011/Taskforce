@@ -1,15 +1,15 @@
-# TaskBoard iOS
+# Taskforce
 
-Native SwiftUI version of the task tracker.
+A concise native SwiftUI task and project organizer for iPhone.
 
 ## What it includes
 
-- Add tasks with notes, priority, and due date
-- Search and filter by status or priority
-- Edit task details after creation
-- Mark tasks done, change status, and delete tasks
-- Summary counts for open, done, overdue, and total tasks
-- On-device persistence with `UserDefaults`
+- Add tasks with notes, priority, due date, status, and an optional project
+- Scan color-coded deadline urgency from overdue through upcoming
+- Search, sort, and filter by status, priority, or project
+- Edit, complete, change status, and delete tasks
+- Review deadline, completion, and project-progress insights
+- Keep tasks on-device with `UserDefaults`
 
 ## Open in Xcode
 
@@ -18,15 +18,14 @@ Open `TaskBoardiOS.xcodeproj`, select an iPhone simulator, and run the
 
 ## Quality checks
 
-Run the complete local quality gate from the `TaskBoardiOS` directory:
+Run the complete local quality gate from the repository root:
 
 ```sh
 sh scripts/verify.sh
 ```
 
-It runs Apple `swift-format` in strict lint mode, executes the XCTest suite,
-runs the lightweight core smoke checks, and compiles the iOS app for the
-simulator without code signing.
+This runs strict Swift formatting checks, the XCTest suite, core smoke checks,
+and an unsigned iOS simulator build.
 
 Run individual checks when iterating:
 
