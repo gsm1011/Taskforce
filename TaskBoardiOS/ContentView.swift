@@ -226,10 +226,12 @@ struct ContentView: View {
         )
       }
     }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
+    .safeAreaPadding(.bottom, 60)
+    .overlay(alignment: .bottom) {
       CompactTabBar(selection: $selectedTab)
         .padding(.horizontal, 24)
-        .padding(.vertical, 6)
+        .padding(.top, 2)
+        .padding(.bottom, 4)
     }
     .tint(AppTheme.accent)
     .sheet(isPresented: $isAddingTask) {
@@ -273,29 +275,18 @@ private struct CompactTabBar: View {
               .symbolRenderingMode(.hierarchical)
             Text(tab.label)
           }
-          .font(.footnote.weight(.semibold))
+          .font(.footnote.weight(selection == tab ? .bold : .semibold))
           .frame(maxWidth: .infinity, minHeight: 44)
           .foregroundStyle(selection == tab ? AppTheme.accent : Color.secondary)
           .contentShape(Rectangle())
-          .background {
-            if selection == tab {
-              Capsule()
-                .fill(AppTheme.accent.opacity(0.12))
-            }
-          }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.label)
         .accessibilityAddTraits(selection == tab ? .isSelected : [])
       }
     }
-    .padding(5)
-    .background(.ultraThinMaterial, in: Capsule())
-    .overlay {
-      Capsule()
-        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-    }
-    .shadow(color: .black.opacity(0.08), radius: 12, y: 5)
+    .padding(4)
+    .background(AppTheme.card, in: Capsule())
   }
 }
 
