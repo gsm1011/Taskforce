@@ -113,11 +113,65 @@ private enum AppTab: CaseIterable, Hashable, Identifiable {
 }
 
 private enum AppTheme {
-  static let accent = Color.indigo
-  static let canvas = Color(uiColor: .systemGroupedBackground)
-  static let card = Color(uiColor: .secondarySystemGroupedBackground)
-  static let border = Color.primary.opacity(0.06)
+  static let accent = adaptiveColor(
+    light: UIColor(red: 9 / 255, green: 105 / 255, blue: 218 / 255, alpha: 1),
+    dark: UIColor(red: 88 / 255, green: 166 / 255, blue: 1, alpha: 1)
+  )
+  static let canvas = adaptiveColor(
+    light: UIColor(red: 246 / 255, green: 248 / 255, blue: 250 / 255, alpha: 1),
+    dark: UIColor(red: 13 / 255, green: 17 / 255, blue: 23 / 255, alpha: 1)
+  )
+  static let card = adaptiveColor(
+    light: .white,
+    dark: UIColor(red: 22 / 255, green: 27 / 255, blue: 34 / 255, alpha: 1)
+  )
+  static let border = adaptiveColor(
+    light: UIColor(red: 208 / 255, green: 215 / 255, blue: 222 / 255, alpha: 1),
+    dark: UIColor(red: 48 / 255, green: 54 / 255, blue: 61 / 255, alpha: 1)
+  )
+  static let selectedTab = adaptiveColor(
+    light: UIColor.black.withAlphaComponent(0.06),
+    dark: UIColor.white.withAlphaComponent(0.12)
+  )
   static let cardRadius: CGFloat = 16
+
+  private static func adaptiveColor(light: UIColor, dark: UIColor) -> Color {
+    Color(
+      uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark ? dark : light
+      }
+    )
+  }
+}
+
+private enum AppAppearance: String, CaseIterable, Identifiable {
+  case system
+  case light
+  case dark
+
+  var id: Self { self }
+
+  var label: String {
+    switch self {
+    case .system:
+      return "System"
+    case .light:
+      return "Light"
+    case .dark:
+      return "Dark"
+    }
+  }
+
+  var colorScheme: ColorScheme? {
+    switch self {
+    case .system:
+      return nil
+    case .light:
+      return .light
+    case .dark:
+      return .dark
+    }
+  }
 }
 
 private enum TaskSort: String, CaseIterable, Identifiable {
@@ -150,6 +204,7 @@ struct ContentView: View {
   @State private var isAddingTask = false
   @State private var taskBeingEdited: TaskItem?
   @AppStorage("default-task-priority") private var defaultPriority: TaskPriority = .medium
+  @AppStorage("app-appearance") private var appearance: AppAppearance = .system
 
   private var stats: TaskStats {
     TaskBoardLogic.stats(for: store.tasks)
@@ -214,6 +269,7 @@ struct ContentView: View {
           projectFilterID: $projectFilterID,
           sortOrder: $sortOrder,
           defaultPriority: $defaultPriority,
+          appearance: $appearance,
           projects: store.projects,
           tasks: store.tasks,
           onAddProject: store.addProject,
@@ -234,6 +290,7 @@ struct ContentView: View {
         .padding(.bottom, 4)
     }
     .tint(AppTheme.accent)
+    .preferredColorScheme(appearance.colorScheme)
     .sheet(isPresented: $isAddingTask) {
       AddTaskView(initialPriority: defaultPriority, projects: store.projects) {
         title, notes, status, priority, dueDate, projectID in
@@ -261,22 +318,38 @@ struct ContentView: View {
 
 private struct CompactTabBar: View {
   @Binding var selection: AppTab
+  @Namespace private var selectionAnimation
 
   var body: some View {
     HStack(spacing: 4) {
       ForEach(AppTab.allCases) { tab in
         Button {
-          withAnimation(.snappy(duration: 0.2)) {
+          withAnimation(.spring(response: 0.32, dampingFraction: 0.76)) {
             selection = tab
           }
         } label: {
-          HStack(spacing: 6) {
-            Image(systemName: selection == tab ? tab.selectedSymbol : tab.symbol)
-              .symbolRenderingMode(.hierarchical)
-            Text(tab.label)
+          ZStack {
+            if selection == tab {
+              RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(AppTheme.selectedTab)
+                .matchedGeometryEffect(id: "selected-tab", in: selectionAnimation)
+            }
+
+            VStack(spacing: 2) {
+              Image(systemName: selection == tab ? tab.selectedSymbol : tab.symbol)
+                .font(.system(size: 18, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.bounce, value: selection == tab)
+
+              Text(tab.label)
+                .font(.caption2.weight(selection == tab ? .bold : .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            }
           }
-          .font(.footnote.weight(selection == tab ? .bold : .semibold))
-          .frame(maxWidth: .infinity, minHeight: 44)
+          .frame(maxWidth: .infinity)
+          .frame(height: 50)
           .foregroundStyle(selection == tab ? AppTheme.accent : Color.secondary)
           .contentShape(Rectangle())
         }
@@ -285,8 +358,10 @@ private struct CompactTabBar: View {
         .accessibilityAddTraits(selection == tab ? .isSelected : [])
       }
     }
-    .padding(4)
-    .background(AppTheme.card, in: Capsule())
+    .padding(5)
+    .frame(maxWidth: 320)
+    .background(.ultraThinMaterial, in: Capsule())
+    .sensoryFeedback(.selection, trigger: selection)
   }
 }
 
@@ -357,7 +432,11 @@ private struct TaskListScreen: View {
       .scrollContentBackground(.hidden)
       .background(AppTheme.canvas)
       .navigationTitle("Tasks")
-      .searchable(text: $searchText, prompt: "Search tasks")
+      .searchable(
+        text: $searchText,
+        placement: .navigationBarDrawer(displayMode: .always),
+        prompt: "Search tasks"
+      )
       .toolbar {
         ToolbarItem(placement: .topBarTrailing) {
           Button(action: onAdd) {
@@ -616,6 +695,7 @@ private struct SettingsScreen: View {
   @Binding var projectFilterID: UUID?
   @Binding var sortOrder: TaskSort
   @Binding var defaultPriority: TaskPriority
+  @Binding var appearance: AppAppearance
   let projects: [ProjectItem]
   let tasks: [TaskItem]
   let onAddProject: (String, ProjectColor) -> Void
@@ -630,6 +710,16 @@ private struct SettingsScreen: View {
   var body: some View {
     NavigationStack {
       Form {
+        Section("Appearance") {
+          Picker("Appearance", selection: $appearance) {
+            ForEach(AppAppearance.allCases) { option in
+              Text(option.label).tag(option)
+            }
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+        }
+
         Section("Task list") {
           Picker(selection: $statusFilter) {
             ForEach(StatusFilter.allCases) { filter in
