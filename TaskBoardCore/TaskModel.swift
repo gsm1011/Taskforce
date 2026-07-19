@@ -175,6 +175,21 @@ public struct TaskStats: Equatable {
   }
 }
 
+public struct DeadlineReliability: Equatable {
+  public var met: Int
+  public var eligible: Int
+
+  public init(met: Int, eligible: Int) {
+    self.met = met
+    self.eligible = eligible
+  }
+
+  public var rate: Double {
+    guard eligible > 0 else { return 0 }
+    return Double(met) / Double(eligible)
+  }
+}
+
 public enum TaskBoardLogic {
   public static func seedProjects() -> [ProjectItem] {
     [
@@ -238,6 +253,32 @@ public enum TaskBoardLogic {
       done: done,
       overdue: overdue
     )
+  }
+
+  public static func deadlineReliability(
+    for tasks: [TaskItem],
+    referenceDate: Date = Date(),
+    calendar: Calendar = .current
+  ) -> DeadlineReliability {
+    var met = 0
+    var eligible = 0
+
+    for task in tasks {
+      if task.status == .done {
+        guard let completedAt = task.completedAt else { continue }
+        eligible += 1
+
+        if calendar.compare(completedAt, to: task.dueDate, toGranularity: .day)
+          != .orderedDescending
+        {
+          met += 1
+        }
+      } else if task.isOverdue(referenceDate: referenceDate, calendar: calendar) {
+        eligible += 1
+      }
+    }
+
+    return DeadlineReliability(met: met, eligible: eligible)
   }
 
   public static func filteredTasks(

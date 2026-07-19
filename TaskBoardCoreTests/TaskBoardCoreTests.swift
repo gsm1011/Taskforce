@@ -105,6 +105,55 @@ final class TaskBoardCoreTests: XCTestCase {
     XCTAssertEqual(stats, TaskStats(total: 3, open: 2, done: 1, overdue: 1))
   }
 
+  func testDeadlineReliabilityIncludesOpenOverdueTasks() {
+    let referenceDate = date(18)
+    let tasks = [
+      TaskItem(
+        title: "Completed on time",
+        status: .done,
+        dueDate: date(15),
+        completedAt: date(15)
+      ),
+      TaskItem(
+        title: "Completed late",
+        status: .done,
+        dueDate: date(14),
+        completedAt: date(16)
+      ),
+      TaskItem(title: "Still overdue", status: .doing, dueDate: date(17)),
+      TaskItem(title: "Upcoming", status: .todo, dueDate: date(19)),
+    ]
+
+    let reliability = TaskBoardLogic.deadlineReliability(
+      for: tasks,
+      referenceDate: referenceDate,
+      calendar: calendar
+    )
+
+    XCTAssertEqual(reliability, DeadlineReliability(met: 1, eligible: 3))
+    XCTAssertEqual(reliability.rate, 1.0 / 3.0, accuracy: 0.001)
+  }
+
+  func testOverdueTaskPreventsPerfectDeadlineReliability() {
+    let tasks = [
+      TaskItem(
+        title: "Completed on time",
+        status: .done,
+        dueDate: date(16),
+        completedAt: date(16)
+      ),
+      TaskItem(title: "Overdue", dueDate: date(17)),
+    ]
+
+    let reliability = TaskBoardLogic.deadlineReliability(
+      for: tasks,
+      referenceDate: date(18),
+      calendar: calendar
+    )
+
+    XCTAssertEqual(reliability.rate, 0.5)
+  }
+
   func testFilteringSearchesTitlesAndNotesCaseInsensitively() {
     let tasks = [
       TaskItem(title: "Review LAUNCH plan", notes: ""),

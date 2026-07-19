@@ -457,16 +457,8 @@ private struct InsightsScreen: View {
     tasks.filter { $0.status == .done && $0.completedAt != nil }
   }
 
-  private var deadlineMetCount: Int {
-    completedTasks.filter { task in
-      guard let completedAt = task.completedAt else { return false }
-      return Calendar.current.compare(completedAt, to: task.dueDate, toGranularity: .day) != .orderedDescending
-    }.count
-  }
-
-  private var deadlineRate: Double {
-    guard !completedTasks.isEmpty else { return 0 }
-    return Double(deadlineMetCount) / Double(completedTasks.count)
+  private var deadlineReliability: DeadlineReliability {
+    TaskBoardLogic.deadlineReliability(for: tasks)
   }
 
   private var averageCompletionLabel: String {
@@ -533,7 +525,7 @@ private struct InsightsScreen: View {
               .frame(height: 68)
 
             InsightMetric(
-              value: "\(Int((deadlineRate * 100).rounded()))%",
+              value: "\(Int((deadlineReliability.rate * 100).rounded()))%",
               label: "Deadlines met",
               symbol: "calendar.badge.checkmark"
             )
@@ -577,7 +569,7 @@ private struct InsightsScreen: View {
 
         Section {
           HStack(spacing: 18) {
-            Gauge(value: deadlineRate) {
+            Gauge(value: deadlineReliability.rate) {
               Text("Deadline reliability")
             }
             .gaugeStyle(.accessoryCircularCapacity)
@@ -585,9 +577,9 @@ private struct InsightsScreen: View {
             .frame(width: 72)
 
             VStack(alignment: .leading, spacing: 4) {
-              Text("\(deadlineMetCount) of \(completedTasks.count) on time")
+              Text("\(deadlineReliability.met) of \(deadlineReliability.eligible) deadlines met")
                 .font(.headline)
-              Text("Based on completed tasks with tracked finish dates.")
+              Text("Includes completed tasks and currently overdue work; upcoming tasks are excluded.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             }
