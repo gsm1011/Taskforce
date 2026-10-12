@@ -6,8 +6,8 @@ A concise native SwiftUI task and project organizer for iPhone.
 
 - Add tasks with notes, priority, due date, status, and an optional project
 - Scan color-coded deadline urgency from overdue through upcoming
-- Search, sort, and filter by status, priority, or project
-- Edit, complete, change status, and delete tasks
+- Search, sort, and filter by due scope, status, priority, or project
+- Edit, complete, change status, and confirm before deleting tasks
 - Review deadline, completion, and project-progress insights
 - Keep tasks on-device with `UserDefaults`
 
