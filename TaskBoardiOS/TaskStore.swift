@@ -23,20 +23,22 @@ final class TaskStore: ObservableObject {
     } else {
       initialProjects = TaskBoardLogic.seedProjects()
     }
-    projects = initialProjects
+    let normalizedProjects = Self.normalizedProjects(initialProjects)
+    projects = normalizedProjects
+    let validProjectIDs = Set(normalizedProjects.map(\.id))
 
     if let data = storage.data(forKey: storageKey),
       let savedTasks = try? decoder.decode([TaskItem].self, from: data)
     {
-      tasks = savedTasks
+      tasks = Self.normalizedTasks(savedTasks, validProjectIDs: validProjectIDs)
     } else {
       var seededTasks = TaskBoardLogic.seedTasks()
-      if initialProjects.count >= 2 {
-        seededTasks[0].projectID = initialProjects[0].id
-        seededTasks[1].projectID = initialProjects[1].id
-        seededTasks[2].projectID = initialProjects[0].id
+      if normalizedProjects.count >= 2, seededTasks.count >= 3 {
+        seededTasks[0].projectID = normalizedProjects[0].id
+        seededTasks[1].projectID = normalizedProjects[1].id
+        seededTasks[2].projectID = normalizedProjects[0].id
       }
-      tasks = seededTasks
+      tasks = Self.normalizedTasks(seededTasks, validProjectIDs: validProjectIDs)
     }
     save()
   }
@@ -148,6 +150,29 @@ final class TaskStore: ObservableObject {
     }
     if let data = try? encoder.encode(projects) {
       storage.set(data, forKey: projectsStorageKey)
+    }
+  }
+
+  private static func normalizedProjects(_ projects: [ProjectItem]) -> [ProjectItem] {
+    var seenIDs = Set<UUID>()
+    return projects.filter { project in
+      seenIDs.insert(project.id).inserted
+    }
+  }
+
+  private static func normalizedTasks(
+    _ tasks: [TaskItem],
+    validProjectIDs: Set<UUID>
+  ) -> [TaskItem] {
+    var seenIDs = Set<UUID>()
+    return tasks.compactMap { task in
+      guard seenIDs.insert(task.id).inserted else { return nil }
+
+      var normalizedTask = task
+      if let projectID = task.projectID, !validProjectIDs.contains(projectID) {
+        normalizedTask.projectID = nil
+      }
+      return normalizedTask
     }
   }
 }

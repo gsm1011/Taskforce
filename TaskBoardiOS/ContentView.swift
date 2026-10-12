@@ -193,6 +193,36 @@ private enum TaskSort: String, CaseIterable, Identifiable {
   }
 }
 
+private enum TaskScope: String, CaseIterable, Identifiable {
+  case all
+  case today
+  case overdue
+
+  var id: String { rawValue }
+
+  var label: String {
+    switch self {
+    case .all:
+      return "All"
+    case .today:
+      return "Today"
+    case .overdue:
+      return "Overdue"
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .all:
+      return "tray.full"
+    case .today:
+      return "sun.max"
+    case .overdue:
+      return "exclamationmark.circle"
+    }
+  }
+}
+
 struct ContentView: View {
   @StateObject private var store = TaskStore()
   @State private var selectedTab: AppTab = .tasks
@@ -200,9 +230,11 @@ struct ContentView: View {
   @State private var statusFilter: StatusFilter = .all
   @State private var priorityFilter: PriorityFilter = .all
   @State private var projectFilterID: UUID?
+  @State private var taskScope: TaskScope = .all
   @State private var sortOrder: TaskSort = .dueSoon
   @State private var isAddingTask = false
   @State private var taskBeingEdited: TaskItem?
+  @State private var taskPendingDeletion: TaskItem?
   @AppStorage("default-task-priority") private var defaultPriority: TaskPriority = .medium
   @AppStorage("app-appearance") private var appearance: AppAppearance = .system
 
@@ -217,7 +249,17 @@ struct ContentView: View {
       status: statusFilter.status,
       priority: priorityFilter.priority
     ).filter { task in
-      projectFilterID == nil || task.projectID == projectFilterID
+      let matchesProject = projectFilterID == nil || task.projectID == projectFilterID
+      let matchesScope: Bool
+      switch taskScope {
+      case .all:
+        matchesScope = true
+      case .today:
+        matchesScope = Calendar.current.isDateInToday(task.dueDate) && !task.isComplete
+      case .overdue:
+        matchesScope = task.isOverdue()
+      }
+      return matchesProject && matchesScope
     }
 
     switch sortOrder {
@@ -238,7 +280,7 @@ struct ContentView: View {
   }
 
   private var hasActiveFilters: Bool {
-    statusFilter != .all || priorityFilter != .all || projectFilterID != nil
+    statusFilter != .all || priorityFilter != .all || projectFilterID != nil || taskScope != .all
   }
 
   var body: some View {
@@ -249,6 +291,8 @@ struct ContentView: View {
           tasks: visibleTasks,
           projects: store.projects,
           totalTaskCount: store.tasks.count,
+          stats: stats,
+          scope: $taskScope,
           searchText: $searchText,
           hasActiveFilters: hasActiveFilters,
           onAdd: { isAddingTask = true },
@@ -256,7 +300,7 @@ struct ContentView: View {
           onToggle: store.toggleComplete,
           onStatusChange: store.setStatus,
           onEdit: { taskBeingEdited = $0 },
-          onDelete: store.delete
+          onDelete: { taskPendingDeletion = $0 }
         )
 
       case .insights:
@@ -267,6 +311,7 @@ struct ContentView: View {
           statusFilter: $statusFilter,
           priorityFilter: $priorityFilter,
           projectFilterID: $projectFilterID,
+          taskScope: $taskScope,
           sortOrder: $sortOrder,
           defaultPriority: $defaultPriority,
           appearance: $appearance,
@@ -312,6 +357,26 @@ struct ContentView: View {
       }
       .presentationDetents([.medium, .large])
       .presentationDragIndicator(.visible)
+    }
+    .alert(
+      "Delete task?",
+      isPresented: Binding(
+        get: { taskPendingDeletion != nil },
+        set: { isPresented in
+          if !isPresented {
+            taskPendingDeletion = nil
+          }
+        }
+      ),
+      presenting: taskPendingDeletion
+    ) { task in
+      Button("Delete", role: .destructive) {
+        store.delete(task)
+        taskPendingDeletion = nil
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { task in
+      Text("\u{201c}\(task.title)\u{201d} will be permanently removed.")
     }
   }
 }
@@ -361,14 +426,23 @@ private struct CompactTabBar: View {
     .padding(5)
     .frame(maxWidth: 320)
     .background(.ultraThinMaterial, in: Capsule())
+    .overlay {
+      Capsule()
+        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+    }
+    .shadow(color: .black.opacity(0.12), radius: 18, y: 8)
     .sensoryFeedback(.selection, trigger: selection)
   }
 }
 
 private struct TaskListScreen: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
   let tasks: [TaskItem]
   let projects: [ProjectItem]
   let totalTaskCount: Int
+  let stats: TaskStats
+  @Binding var scope: TaskScope
   @Binding var searchText: String
   let hasActiveFilters: Bool
   let onAdd: () -> Void
@@ -381,6 +455,35 @@ private struct TaskListScreen: View {
   var body: some View {
     NavigationStack {
       List {
+        Section {
+          ScopePicker(selection: $scope)
+            .padding(.vertical, 2)
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 2, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+
+        Section {
+          VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("Your workspace")
+                .font(.title2.weight(.bold))
+              Text(stats.open == 0 ? "Everything is under control." : "Keep your next move in sight.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+
+            SummaryStrip(stats: stats)
+              .padding(.vertical, 10)
+              .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+          }
+          .padding(.top, 8)
+          .padding(.bottom, 4)
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+
         if hasActiveFilters {
           HStack {
             Label("\(tasks.count) of \(totalTaskCount) tasks", systemImage: "line.3.horizontal.decrease")
@@ -431,6 +534,7 @@ private struct TaskListScreen: View {
       .listStyle(.plain)
       .scrollContentBackground(.hidden)
       .background(AppTheme.canvas)
+      .safeAreaPadding(.horizontal, horizontalSizeClass == .regular ? 56 : 0)
       .navigationTitle("Tasks")
       .searchable(
         text: $searchText,
@@ -438,10 +542,16 @@ private struct TaskListScreen: View {
         prompt: "Search tasks"
       )
       .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button(action: onAdd) {
-            Label("New task", systemImage: "plus")
+        ToolbarItem(placement: .topBarLeading) {
+          Button(action: onOpenFilters) {
+            Image(
+              systemName: hasActiveFilters
+                ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
           }
+          .accessibilityLabel(hasActiveFilters ? "Adjust active filters" : "Open filters")
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button(action: onAdd) { Label("New task", systemImage: "plus") }
         }
       }
     }
@@ -449,6 +559,8 @@ private struct TaskListScreen: View {
 }
 
 private struct InsightsScreen: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
   let tasks: [TaskItem]
   let projects: [ProjectItem]
   let stats: TaskStats
@@ -592,6 +704,7 @@ private struct InsightsScreen: View {
       .listStyle(.insetGrouped)
       .scrollContentBackground(.hidden)
       .background(AppTheme.canvas)
+      .safeAreaPadding(.horizontal, horizontalSizeClass == .regular ? 56 : 0)
       .navigationTitle("Insights")
     }
   }
@@ -682,9 +795,12 @@ private struct InsightMetric: View {
 }
 
 private struct SettingsScreen: View {
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
   @Binding var statusFilter: StatusFilter
   @Binding var priorityFilter: PriorityFilter
   @Binding var projectFilterID: UUID?
+  @Binding var taskScope: TaskScope
   @Binding var sortOrder: TaskSort
   @Binding var defaultPriority: TaskPriority
   @Binding var appearance: AppAppearance
@@ -696,7 +812,7 @@ private struct SettingsScreen: View {
   @State private var isAddingProject = false
 
   private var hasActiveFilters: Bool {
-    statusFilter != .all || priorityFilter != .all || projectFilterID != nil
+    statusFilter != .all || priorityFilter != .all || projectFilterID != nil || taskScope != .all
   }
 
   var body: some View {
@@ -789,6 +905,7 @@ private struct SettingsScreen: View {
             statusFilter = .all
             priorityFilter = .all
             projectFilterID = nil
+            taskScope = .all
           } label: {
             Label("Clear task filters", systemImage: "line.3.horizontal.decrease.circle")
           }
@@ -799,11 +916,42 @@ private struct SettingsScreen: View {
       }
       .scrollContentBackground(.hidden)
       .background(AppTheme.canvas)
+      .safeAreaPadding(.horizontal, horizontalSizeClass == .regular ? 56 : 0)
       .navigationTitle("Settings")
       .sheet(isPresented: $isAddingProject) {
         NewProjectView(onAdd: onAddProject)
           .presentationDetents([.medium])
           .presentationDragIndicator(.visible)
+      }
+    }
+  }
+}
+
+private struct ScopePicker: View {
+  @Binding var selection: TaskScope
+
+  var body: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 8) {
+        ForEach(TaskScope.allCases) { scope in
+          Button {
+            withAnimation(.snappy(duration: 0.2)) {
+              selection = scope
+            }
+          } label: {
+            Label(scope.label, systemImage: scope.symbol)
+              .font(.subheadline.weight(.semibold))
+              .padding(.horizontal, 13)
+              .padding(.vertical, 9)
+              .foregroundStyle(selection == scope ? .white : .primary)
+              .background {
+                Capsule()
+                  .fill(selection == scope ? AppTheme.accent : AppTheme.card)
+              }
+          }
+          .buttonStyle(.plain)
+          .accessibilityAddTraits(selection == scope ? .isSelected : [])
+        }
       }
     }
   }
